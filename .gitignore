@@ -1,0 +1,10 @@
+# Environment lokal (berisi IP/pengaturan spesifik host)
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

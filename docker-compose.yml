@@ -51,7 +51,7 @@ services:
     ports:
       - "${SERVER_IP}:80:80"
     volumes:
-      - ./openlitespeed/html:/var/www/html:ro
+      - ./web/html:/var/www/html:ro
     environment:
       TZ: ${TZ:-Asia/Jakarta}
     networks: [ k3net ]

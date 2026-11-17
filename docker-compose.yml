@@ -1,0 +1,116 @@
+name: pamj-k3-infra
+
+services:
+  bind9:
+    image: internetsystemsconsortium/bind9:9.18
+    container_name: k3-bind9
+    restart: unless-stopped
+    ports:
+      - "${SERVER_IP}:53:53/udp"
+      - "${SERVER_IP}:53:53/tcp"
+    configs:
+      - source: named_conf
+        target: /etc/bind/named.conf
+      - source: zone_k3_lan
+        target: /etc/bind/zones/db.k3.lan
+    volumes:
+      - bind-cache:/var/cache/bind
+    networks: [k3net]
+
+  ntp:
+    build:
+      dockerfile_inline: |
+        FROM alpine:3.20
+        RUN apk add --no-cache chrony tzdata \
+         && mkdir -p /run/chrony /var/lib/chrony \
+         && chown -R chrony:chrony /run/chrony /var/lib/chrony
+    container_name: k3-ntp
+    restart: unless-stopped
+    command: ["chronyd", "-d", "-f", "/etc/chrony/chrony.conf"]
+    cap_add: [SYS_TIME]
+    ports:
+      - "${SERVER_IP}:123:123/udp"
+    configs:
+      - source: chrony_conf
+        target: /etc/chrony/chrony.conf
+    volumes:
+      - chrony-data:/var/lib/chrony
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+    healthcheck:
+      test: ["CMD-SHELL", "pidof chronyd"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [k3net]
+
+  web:
+    image: php:8.3-apache
+    container_name: k3-web
+    restart: unless-stopped
+    ports:
+      - "${SERVER_IP}:80:80"
+    volumes:
+      - ./openlitespeed/html:/var/www/html:ro
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+    networks: [ k3net ]
+
+configs:
+  named_conf:
+    content: |
+      acl "lan" { localhost; localnets; 10.0.0.0/8; 172.16.0.0/12; 192.168.0.0/16; };
+
+      options {
+          directory "/var/cache/bind";
+          listen-on { any; };
+          listen-on-v6 { none; };
+          recursion yes;
+          allow-recursion { lan; };
+          allow-query { lan; };
+          allow-query-cache { lan; };
+          allow-transfer { none; };
+          dnssec-validation auto;
+          version none;
+          minimal-responses yes;
+      };
+
+      logging {
+          channel docker_log { stderr; severity info; print-time yes; };
+          category default { docker_log; };
+      };
+
+      zone "k3.lan" {
+          type master;
+          file "/etc/bind/zones/db.k3.lan";
+          allow-update { none; };
+      };
+
+  zone_k3_lan:
+    content: |
+      $$TTL 300
+      @   IN SOA ns.k3.lan. admin.k3.lan. ( ${ZONE_SERIAL:-1} 3600 600 86400 300 )
+      @   IN NS  ns.k3.lan.
+      ns  IN A   ${SERVER_IP}
+      @   IN A   ${SERVER_IP}
+      www IN A   ${SERVER_IP}
+      ntp IN A   ${SERVER_IP}
+
+  chrony_conf:
+    content: |
+      pool 0.id.pool.ntp.org iburst maxsources 2
+      pool 1.asia.pool.ntp.org iburst maxsources 2
+      driftfile /var/lib/chrony/chrony.drift
+      makestep 1.0 3
+      allow 10.0.0.0/8
+      allow 172.16.0.0/12
+      allow 192.168.0.0/16
+      local stratum 10
+      cmdport 0
+
+networks:
+  k3net:
+
+volumes:
+  bind-cache:
+  chrony-data:

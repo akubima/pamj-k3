@@ -33,9 +33,9 @@ cp .env.example .env
 ```
 
 ```env
-SERVER_IP=10.101.3.179     # IP LAN host Docker
+SERVER_IP=192.168.1.10     # IP LAN host Docker (sesuaikan dengan IP server)
 TZ=Asia/Jakarta
-# ZONE_SERIAL=1            # naikkan setiap kali record DNS diubah
+# ZONE_SERIAL=1            # opsional, naikkan setiap kali record DNS diubah
 ```
 
 ## Menjalankan
@@ -68,11 +68,11 @@ Di dalam `content:`, tanda `$` harus ditulis `$$` (mis. `$$TTL`), karena Compose
 
 ## Pengujian
 
-### DNS (Windows)
+### DNS (Windows / Linux)
 
-```
-nslookup ntp.k3.lan 10.101.3.179        # harus menjawab SERVER_IP
-nslookup example.com 10.101.3.179       # tes recursion
+```bash
+nslookup ntp.k3.lan 192.168.1.10        # harus menjawab SERVER_IP
+nslookup example.com 192.168.1.10       # tes recursion
 ```
 
 ### NTP dari Windows (tanpa mengubah setting)
@@ -87,7 +87,7 @@ Nilai `+` berarti jam komputer lebih lambat dari server, `-` berarti lebih cepat
 ### NTP dari Linux
 
 ```bash
-chronyc -h 10.101.3.179 sources         # atau: ntpdate -q ntp.k3.lan
+chronyd -Q 'server ntp.k3.lan iburst'  # atau: ntpdate -q ntp.k3.lan
 sntp ntp.k3.lan
 ```
 
